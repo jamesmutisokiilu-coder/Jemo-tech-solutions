@@ -17,10 +17,10 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise Exception("DATABASE_URL not set in environment variables")
 
-# FIX FOR RENDER + USE pg8000 DRIVER
+# FIX POSTGRES DRIVER FOR pg8000
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+pg8000://", 1)
-else:
+elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+pg8000://", 1)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
@@ -29,9 +29,11 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 # ==========================================
-# MODELS
+# MODELS (FIXED + SAFE TABLE NAME)
 # ==========================================
 class User(db.Model):
+    __tablename__ = "users"   # 🔥 IMPORTANT FIX (prevents your error)
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), nullable=False)
     email = db.Column(db.String(150), unique=True, nullable=False)
@@ -39,6 +41,8 @@ class User(db.Model):
 
 
 class Support(db.Model):
+    __tablename__ = "support"
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150))
     email = db.Column(db.String(150))
@@ -49,6 +53,8 @@ class Support(db.Model):
 
 
 class TrainingRequest(db.Model):
+    __tablename__ = "training_requests"
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150))
     course = db.Column(db.String(150))
@@ -56,6 +62,8 @@ class TrainingRequest(db.Model):
 
 
 class Booking(db.Model):
+    __tablename__ = "bookings"
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150))
     service = db.Column(db.String(150))
@@ -63,7 +71,7 @@ class Booking(db.Model):
 
 
 # ==========================================
-# CREATE TABLES
+# SAFE TABLE CREATION
 # ==========================================
 with app.app_context():
     db.create_all()
@@ -75,9 +83,8 @@ with app.app_context():
 def home():
     return render_template("index.html")
 
-
 # ==========================================
-# REGISTER (FIXED)
+# REGISTER (FIXED + SAFE)
 # ==========================================
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -90,25 +97,26 @@ def register():
 
         try:
             existing = User.query.filter_by(email=email).first()
+
             if existing:
                 return render_template("register.html", message="Email already exists")
 
-            user = User(
+            new_user = User(
                 username=username,
                 email=email,
                 password=generate_password_hash(password)
             )
 
-            db.session.add(user)
+            db.session.add(new_user)
             db.session.commit()
 
             return redirect(url_for("login"))
 
         except Exception as e:
-            return render_template("register.html", message=str(e))
+            db.session.rollback()
+            return render_template("register.html", message=f"Database error: {str(e)}")
 
     return render_template("register.html", message=message)
-
 
 # ==========================================
 # LOGIN
@@ -121,16 +129,19 @@ def login():
         email = request.form["email"]
         password = request.form["password"]
 
-        user = User.query.filter_by(email=email).first()
+        try:
+            user = User.query.filter_by(email=email).first()
 
-        if user and check_password_hash(user.password, password):
-            session["user"] = user.username
-            return redirect(url_for("dashboard"))
-        else:
-            message = "Invalid login details"
+            if user and check_password_hash(user.password, password):
+                session["user"] = user.username
+                return redirect(url_for("dashboard"))
+            else:
+                message = "Invalid login details"
+
+        except Exception as e:
+            message = f"Database error: {str(e)}"
 
     return render_template("login.html", message=message)
-
 
 # ==========================================
 # DASHBOARD
@@ -142,7 +153,6 @@ def dashboard():
 
     return render_template("dashboard.html", username=session["user"])
 
-
 # ==========================================
 # LOGOUT
 # ==========================================
@@ -150,7 +160,6 @@ def dashboard():
 def logout():
     session.clear()
     return redirect(url_for("login"))
-
 
 # ==========================================
 # PROTECTED PAGES
@@ -160,36 +169,29 @@ def protected(page):
         return redirect(url_for("login"))
     return render_template(page)
 
-
 @app.route("/services")
 def services():
     return protected("services.html")
-
 
 @app.route("/portfolio")
 def portfolio():
     return protected("portfolio.html")
 
-
 @app.route("/blog")
 def blog():
     return protected("blog.html")
-
 
 @app.route("/downloads")
 def downloads():
     return protected("downloads.html")
 
-
 @app.route("/about")
 def about():
     return protected("about.html")
 
-
 @app.route("/contact")
 def contact():
     return protected("contact.html")
-
 
 # ==========================================
 # SUPPORT
@@ -200,7 +202,7 @@ def support():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        support = Support(
+        new_support = Support(
             name=request.form["name"],
             email=request.form["email"],
             phone=request.form["phone"],
@@ -209,13 +211,12 @@ def support():
             message=request.form["message"]
         )
 
-        db.session.add(support)
+        db.session.add(new_support)
         db.session.commit()
 
         return redirect(url_for("dashboard"))
 
     return render_template("support.html")
-
 
 # ==========================================
 # TRAINING
@@ -239,7 +240,6 @@ def training():
 
     return render_template("training.html")
 
-
 # ==========================================
 # BOOKING
 # ==========================================
@@ -261,7 +261,6 @@ def booking():
         return redirect(url_for("dashboard"))
 
     return render_template("booking.html")
-
 
 # ==========================================
 # RUN
