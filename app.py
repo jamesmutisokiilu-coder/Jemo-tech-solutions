@@ -1,13 +1,6 @@
 from flask import Flask, render_template, request, redirect, session, url_for
+from flask_sqlalchemy import SQLAlchemy
 import os
-
-# Safe import (prevents Render crash)
-try:
-    import psycopg2
-    from psycopg2.extras import RealDictCursor
-except Exception:
-    psycopg2 = None
-    RealDictCursor = None
 
 app = Flask(__name__)
 
@@ -15,78 +8,55 @@ app = Flask(__name__)
 # CONFIG
 # ==========================================
 app.secret_key = os.environ.get("SECRET_KEY", "jemo_secret_key")
+
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# ==========================================
-# DATABASE CONNECTION
-# ==========================================
-def get_db():
-    if not DATABASE_URL:
-        raise Exception("DATABASE_URL not set")
+# Fix Render postgres URL format
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-    if psycopg2 is None:
-        raise Exception("psycopg2 not installed correctly")
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+db = SQLAlchemy(app)
 
 # ==========================================
-# INIT DATABASE
+# MODELS
 # ==========================================
-def init_db():
-    if not DATABASE_URL or psycopg2 is None:
-        print("DB init skipped (missing DB or psycopg2)")
-        return
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
 
-    conn = get_db()
-    cur = conn.cursor()
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users(
-        id SERIAL PRIMARY KEY,
-        username TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
-    )
-    """)
+class Support(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200))
+    email = db.Column(db.String(200))
+    phone = db.Column(db.String(100))
+    category = db.Column(db.String(100))
+    priority = db.Column(db.String(100))
+    message = db.Column(db.Text)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS support(
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT NOT NULL,
-        phone TEXT,
-        category TEXT,
-        priority TEXT,
-        message TEXT NOT NULL
-    )
-    """)
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS training_requests(
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        course TEXT NOT NULL,
-        email TEXT NOT NULL
-    )
-    """)
+class Training(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200))
+    course = db.Column(db.String(200))
+    email = db.Column(db.String(200))
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS bookings(
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        service TEXT NOT NULL,
-        date TEXT NOT NULL
-    )
-    """)
 
-    conn.commit()
-    conn.close()
+class Booking(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200))
+    service = db.Column(db.String(200))
+    date = db.Column(db.String(100))
 
-# run safely
-try:
-    init_db()
-except Exception as e:
-    print("DB init error:", e)
+
+# Create tables
+with app.app_context():
+    db.create_all()
 
 # ==========================================
 # HOME
@@ -94,6 +64,7 @@ except Exception as e:
 @app.route("/")
 def home():
     return render_template("index.html")
+
 
 # ==========================================
 # REGISTER
@@ -103,28 +74,23 @@ def register():
     message = ""
 
     if request.method == "POST":
-        username = request.form["username"]
-        email = request.form["email"]
-        password = request.form["password"]
-
         try:
-            conn = get_db()
-            cur = conn.cursor()
+            user = User(
+                username=request.form["username"],
+                email=request.form["email"],
+                password=request.form["password"]
+            )
 
-            cur.execute("""
-                INSERT INTO users(username,email,password)
-                VALUES(%s,%s,%s)
-            """, (username, email, password))
-
-            conn.commit()
-            conn.close()
+            db.session.add(user)
+            db.session.commit()
 
             return redirect(url_for("login"))
 
         except Exception as e:
-            message = str(e)
+            message = f"Error: {str(e)}"
 
     return render_template("register.html", message=message)
+
 
 # ==========================================
 # LOGIN
@@ -134,31 +100,19 @@ def login():
     message = ""
 
     if request.method == "POST":
-        email = request.form["email"]
-        password = request.form["password"]
+        user = User.query.filter_by(
+            email=request.form["email"],
+            password=request.form["password"]
+        ).first()
 
-        try:
-            conn = get_db()
-            cur = conn.cursor()
-
-            cur.execute("""
-                SELECT * FROM users
-                WHERE email=%s AND password=%s
-            """, (email, password))
-
-            user = cur.fetchone()
-            conn.close()
-
-            if user:
-                session["user"] = user["username"]
-                return redirect(url_for("dashboard"))
-            else:
-                message = "Invalid login details"
-
-        except Exception as e:
-            message = str(e)
+        if user:
+            session["user"] = user.username
+            return redirect(url_for("dashboard"))
+        else:
+            message = "Invalid login details"
 
     return render_template("login.html", message=message)
+
 
 # ==========================================
 # DASHBOARD
@@ -170,6 +124,7 @@ def dashboard():
 
     return render_template("dashboard.html", username=session["user"])
 
+
 # ==========================================
 # LOGOUT
 # ==========================================
@@ -177,6 +132,7 @@ def dashboard():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
 
 # ==========================================
 # PROTECTED PAGES
@@ -186,29 +142,36 @@ def protected(page):
         return redirect(url_for("login"))
     return render_template(page)
 
+
 @app.route("/services")
 def services():
     return protected("services.html")
+
 
 @app.route("/portfolio")
 def portfolio():
     return protected("portfolio.html")
 
+
 @app.route("/blog")
 def blog():
     return protected("blog.html")
+
 
 @app.route("/downloads")
 def downloads():
     return protected("downloads.html")
 
+
 @app.route("/about")
 def about():
     return protected("about.html")
 
+
 @app.route("/contact")
 def contact():
     return protected("contact.html")
+
 
 # ==========================================
 # SUPPORT
@@ -219,27 +182,22 @@ def support():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        name = request.form["name"]
-        email = request.form["email"]
-        phone = request.form["phone"]
-        category = request.form["category"]
-        priority = request.form["priority"]
-        message = request.form["message"]
+        s = Support(
+            name=request.form["name"],
+            email=request.form["email"],
+            phone=request.form["phone"],
+            category=request.form["category"],
+            priority=request.form["priority"],
+            message=request.form["message"]
+        )
 
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute("""
-            INSERT INTO support(name,email,phone,category,priority,message)
-            VALUES(%s,%s,%s,%s,%s,%s)
-        """, (name, email, phone, category, priority, message))
-
-        conn.commit()
-        conn.close()
+        db.session.add(s)
+        db.session.commit()
 
         return redirect(url_for("dashboard"))
 
     return render_template("support.html")
+
 
 # ==========================================
 # TRAINING
@@ -250,24 +208,19 @@ def training():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        name = request.form["name"]
-        course = request.form["course"]
-        email = request.form["email"]
+        t = Training(
+            name=request.form["name"],
+            course=request.form["course"],
+            email=request.form["email"]
+        )
 
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute("""
-            INSERT INTO training_requests(name,course,email)
-            VALUES(%s,%s,%s)
-        """, (name, course, email))
-
-        conn.commit()
-        conn.close()
+        db.session.add(t)
+        db.session.commit()
 
         return redirect(url_for("dashboard"))
 
     return render_template("training.html")
+
 
 # ==========================================
 # BOOKING
@@ -278,24 +231,19 @@ def booking():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        name = request.form["name"]
-        service = request.form["service"]
-        date = request.form["date"]
+        b = Booking(
+            name=request.form["name"],
+            service=request.form["service"],
+            date=request.form["date"]
+        )
 
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute("""
-            INSERT INTO bookings(name,service,date)
-            VALUES(%s,%s,%s)
-        """, (name, service, date))
-
-        conn.commit()
-        conn.close()
+        db.session.add(b)
+        db.session.commit()
 
         return redirect(url_for("dashboard"))
 
     return render_template("booking.html")
+
 
 # ==========================================
 # RUN APP
