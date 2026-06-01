@@ -1,1 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Jemo Tech Solutions</title>
 
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial;
+}
+
+body{
+background:linear-gradient(135deg,#0d47a1,#1976d2);
+height:100vh;
+color:white;
+}
+
+/* TOP BAR */
+.topbar{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:20px 40px;
+}
+
+/* LOGO */
+.logo{
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.logo img{
+width:60px;
+height:60px;
+border-radius:10px;
+}
+
+.logo h2{
+font-size:22px;
+}
+
+/* PASSPORT IMAGE */
+.profile img{
+width:70px;
+height:70px;
+border-radius:50%;
+border:2px solid white;
+object-fit:cover;
+}
+
+/* CENTER CONTENT */
+.center{
+height:70vh;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+text-align:center;
+}
+
+.center h1{
+font-size:50px;
+margin-bottom:10px;
+}
+
+.center p{
+font-size:18px;
+opacity:0.9;
+margin-bottom:30px;
+}
+
+/* BUTTONS */
+.btns{
+display:flex;
+gap:20px;
+}
+
+.btn{
+padding:12px 25px;
+border:none;
+border-radius:6px;
+font-size:16px;
+cursor:pointer;
+text-decoration:none;
+font-weight:bold;
+}
+
+.register{
+background:#ffeb3b;
+color:black;
+}
+
+.login{
+background:white;
+color:#0d47a1;
+}
+
+.btn:hover{
+opacity:0.85;
+}
+
+/* FOOTER */
+footer{
+position:absolute;
+bottom:10px;
+width:100%;
+text-align:center;
+font-size:12px;
+opacity:0.8;
+}
+</style>
+
+</head>
+
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+
+<!-- LOGO LEFT -->
+<div class="logo">
+<img src="/static/images/jemo.jpeg">
+<h2>Jemo Tech Solutions</h2>
+</div>
+
+<!-- PASSPORT RIGHT -->
+<div class="profile">
+<img src="/static/images/jemo1.jpeg">
+</div>
+
+</div>
+
+<!-- CENTER -->
+<div class="center">
+
+<h1>Welcome to Jemo Tech</h1>
+<p>Smart ICT Solutions • Web Development • Networking • Cyber Services</p>
+
+<div class="btns">
+<a href="/register" class="btn register">Register</a>
+<a href="/login" class="btn login">Login</a>
+</div>
+
+</div>
+
+<!-- FOOTER -->
+<footer>
+© 2026 Jemo Tech Solutions | All Rights Reserved
+</footer>
+
+</body>
+</html>
