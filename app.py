@@ -1,7 +1,13 @@
 from flask import Flask, render_template, request, redirect, session, url_for
 import os
+
+# PostgreSQL
 import psycopg2
 from psycopg2.extras import RealDictCursor
+
+# Password security (IMPORTANT FIX)
+from werkzeug.security import generate_password_hash, check_password_hash
+
 
 app = Flask(__name__)
 
@@ -13,14 +19,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
 # ==========================================
-# DB CONNECTION (SAFE)
+# DB CONNECTION
 # ==========================================
 def get_db():
-    """
-    Works ONLY if DATABASE_URL is set (Render PostgreSQL).
-    """
     if not DATABASE_URL:
-        raise Exception("DATABASE_URL not set. Add PostgreSQL on Render.")
+        raise Exception("DATABASE_URL not set in environment variables")
 
     return psycopg2.connect(
         DATABASE_URL,
@@ -29,13 +32,9 @@ def get_db():
 
 
 # ==========================================
-# INIT DB (SAFE FOR RENDER)
+# INIT DATABASE
 # ==========================================
 def init_db():
-    """
-    Runs only when DATABASE_URL exists.
-    On Render, PostgreSQL is already available.
-    """
     if not DATABASE_URL:
         print("Skipping DB init (no DATABASE_URL)")
         return
@@ -43,6 +42,7 @@ def init_db():
     conn = get_db()
     cur = conn.cursor()
 
+    # USERS
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
         id SERIAL PRIMARY KEY,
@@ -52,6 +52,7 @@ def init_db():
     )
     """)
 
+    # SUPPORT
     cur.execute("""
     CREATE TABLE IF NOT EXISTS support(
         id SERIAL PRIMARY KEY,
@@ -64,6 +65,7 @@ def init_db():
     )
     """)
 
+    # TRAINING
     cur.execute("""
     CREATE TABLE IF NOT EXISTS training_requests(
         id SERIAL PRIMARY KEY,
@@ -73,6 +75,7 @@ def init_db():
     )
     """)
 
+    # BOOKINGS
     cur.execute("""
     CREATE TABLE IF NOT EXISTS bookings(
         id SERIAL PRIMARY KEY,
@@ -86,7 +89,7 @@ def init_db():
     conn.close()
 
 
-# Run DB init safely
+# Safe init
 try:
     init_db()
 except Exception as e:
@@ -109,7 +112,7 @@ def home():
 
 
 # ==========================================
-# REGISTER
+# REGISTER (HASHED PASSWORD FIX)
 # ==========================================
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -120,6 +123,8 @@ def register():
         email = request.form["email"]
         password = request.form["password"]
 
+        hashed_password = generate_password_hash(password)
+
         try:
             conn = get_db()
             cur = conn.cursor()
@@ -127,7 +132,7 @@ def register():
             cur.execute("""
                 INSERT INTO users(username,email,password)
                 VALUES(%s,%s,%s)
-            """, (username, email, password))
+            """, (username, email, hashed_password))
 
             conn.commit()
             conn.close()
@@ -141,7 +146,7 @@ def register():
 
 
 # ==========================================
-# LOGIN
+# LOGIN (HASH CHECK FIX)
 # ==========================================
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -155,14 +160,13 @@ def login():
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT * FROM users
-            WHERE email=%s AND password=%s
-        """, (email, password))
+            SELECT * FROM users WHERE email=%s
+        """, (email,))
 
         user = cur.fetchone()
         conn.close()
 
-        if user:
+        if user and check_password_hash(user["password"], password):
             session["user"] = user["username"]
             return redirect(url_for("dashboard"))
         else:
@@ -231,7 +235,7 @@ def contact():
 
 
 # ==========================================
-# SUPPORT (FIXED)
+# SUPPORT
 # ==========================================
 @app.route("/support", methods=["GET", "POST"])
 def support():
@@ -389,7 +393,6 @@ def delete_user(id):
 
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute("DELETE FROM users WHERE id=%s", (id,))
     conn.commit()
     conn.close()
@@ -404,7 +407,6 @@ def delete_support(id):
 
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute("DELETE FROM support WHERE id=%s", (id,))
     conn.commit()
     conn.close()
@@ -419,7 +421,6 @@ def delete_training(id):
 
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute("DELETE FROM training_requests WHERE id=%s", (id,))
     conn.commit()
     conn.close()
@@ -434,7 +435,6 @@ def delete_booking(id):
 
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute("DELETE FROM bookings WHERE id=%s", (id,))
     conn.commit()
     conn.close()
@@ -443,7 +443,7 @@ def delete_booking(id):
 
 
 # ==========================================
-# RUN (RENDER READY)
+# RUN APP
 # ==========================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
