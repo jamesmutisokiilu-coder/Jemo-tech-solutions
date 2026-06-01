@@ -171,7 +171,7 @@ def services():
 
 @app.route("/admin")
 def admin():
-    ...
+    return render_template("admin.html")
 
 @app.route("/portfolio")
 def portfolio():
