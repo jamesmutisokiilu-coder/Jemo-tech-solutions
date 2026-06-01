@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Blog - Jemo Tech Solutions</title>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial;
+}
+
+body{
+background:#f4f6f9;
+}
+
+/* HEADER */
+.header{
+background:#0d47a1;
+color:white;
+padding:25px;
+text-align:center;
+}
+
+.header h1{
+font-size:32px;
+}
+
+/* SEARCH BAR */
+.search-box{
+max-width:600px;
+margin:20px auto;
+display:flex;
+padding:0 20px;
+}
+
+.search-box input{
+width:100%;
+padding:12px;
+border:1px solid #ccc;
+border-radius:30px;
+outline:none;
+font-size:16px;
+box-shadow:0 3px 10px rgba(0,0,0,0.1);
+}
+
+/* BLOG CONTAINER */
+.container{
+padding:30px;
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+gap:20px;
+}
+
+/* CARD */
+.card{
+background:white;
+border-radius:12px;
+overflow:hidden;
+box-shadow:0 0 10px rgba(0,0,0,0.1);
+transition:0.3s;
+}
+
+.card:hover{
+transform:translateY(-5px);
+}
+
+.card img{
+width:100%;
+height:180px;
+object-fit:cover;
+}
+
+.content{
+padding:20px;
+}
+
+.content h2{
+color:#0d47a1;
+margin-bottom:10px;
+}
+
+.content p{
+font-size:14px;
+line-height:1.6;
+color:#333;
+}
+
+.tag{
+display:inline-block;
+margin-top:10px;
+padding:5px 10px;
+background:#0d47a1;
+color:white;
+font-size:12px;
+border-radius:20px;
+}
+
+/* FOOTER */
+footer{
+text-align:center;
+padding:20px;
+background:#0d47a1;
+color:white;
+margin-top:20px;
+}
+
+/* HIDE CLASS FOR SEARCH */
+.hide{
+display:none;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="header">
+<h1>Jemo Tech Blog</h1>
+<p>Latest updates in Technology, Cybersecurity & AI</p>
+</div>
+
+<!-- SEARCH BAR -->
+<div class="search-box">
+<input type="text" id="searchInput" onkeyup="searchBlog()" placeholder="Search blog articles...">
+</div>
+
+<div class="container" id="blogContainer">
+
+<!-- ARTICLE 1 -->
+<div class="card">
+<img src="https://images.unsplash.com/photo-1518770660439-4636190af475">
+
+<div class="content">
+<h2>Top Programming Languages in 2026</h2>
+<p>Python, JavaScript, and Go continue to dominate modern software development worldwide...</p>
+<span class="tag">Programming</span>
+</div>
+</div>
+
+<!-- ARTICLE 2 -->
+<div class="card">
+<img src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b">
+
+<div class="content">
+<h2>Cybersecurity Tips for 2026</h2>
+<p>Cybersecurity is more important than ever as online threats continue to increase...</p>
+<span class="tag">Security</span>
+</div>
+</div>
+
+<!-- ARTICLE 3 -->
+<div class="card">
+<img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71">
+
+<div class="content">
+<h2>AI in Modern Business</h2>
+<p>Artificial Intelligence is transforming how businesses operate worldwide...</p>
+<span class="tag">AI</span>
+</div>
+</div>
+
+<!-- ARTICLE 4 -->
+<div class="card">
+<img src="https://images.unsplash.com/photo-1519389950473-47ba0277781c">
+
+<div class="content">
+<h2>Future of Web Development</h2>
+<p>Web development is moving towards faster, smarter applications...</p>
+<span class="tag">Web Dev</span>
+</div>
+</div>
+
+<!-- ARTICLE 5 -->
+<div class="card">
+<img src="https://images.unsplash.com/photo-1581090700227-1e8c1e5c2b3d">
+
+<div class="content">
+<h2>Networking Trends</h2>
+<p>Networking is evolving with cloud computing and 5G technology...</p>
+<span class="tag">Networking</span>
+</div>
+</div>
+
+<!-- ARTICLE 6 -->
+<div class="card">
+<img src="https://images.unsplash.com/photo-1585079542156-2755d9c8a094">
+
+<div class="content">
+<h2>Importance of ICT in Education</h2>
+<p>ICT is transforming education by making learning more interactive...</p>
+<span class="tag">Education</span>
+</div>
+</div>
+
+</div>
+
+<footer>
+© 2026 Jemo Tech Solutions | All Rights Reserved
+</footer>
+
+<!-- SEARCH SCRIPT -->
+<script>
+function searchBlog(){
+    let input = document.getElementById("searchInput").value.toLowerCase();
+    let cards = document.getElementsByClassName("card");
+
+    for(let i=0;i<cards.length;i++){
+        let title = cards[i].getElementsByTagName("h2")[0].innerText.toLowerCase();
+        let text = cards[i].getElementsByTagName("p")[0].innerText.toLowerCase();
+
+        if(title.includes(input) || text.includes(input)){
+            cards[i].style.display = "";
+        } else {
+            cards[i].style.display = "none";
+        }
+    }
+}
+</script>
+
+</body>
+</html>

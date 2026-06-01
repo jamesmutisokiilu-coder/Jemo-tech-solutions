@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Register - Jemo Tech</title>
+
+<style>
+
+/* RESET */
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:'Segoe UI', sans-serif;
+}
+
+/* BACKGROUND */
+body{
+height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+background:linear-gradient(-45deg,#0d47a1,#42a5f5,#1e88e5,#1565c0);
+background-size:400% 400%;
+animation:gradientBG 10s ease infinite;
+}
+
+/* BACKGROUND ANIMATION */
+@keyframes gradientBG{
+0%{background-position:0% 50%;}
+50%{background-position:100% 50%;}
+100%{background-position:0% 50%;}
+}
+
+/* REGISTER CARD */
+.form-box{
+width:400px;
+padding:35px;
+border-radius:18px;
+background:rgba(255,255,255,0.15);
+backdrop-filter:blur(15px);
+border:1px solid rgba(255,255,255,0.3);
+box-shadow:0 10px 30px rgba(0,0,0,0.3);
+color:white;
+}
+
+/* TITLE */
+.form-box h1{
+text-align:center;
+margin-bottom:20px;
+font-size:28px;
+}
+
+/* INPUTS */
+input{
+width:100%;
+padding:13px;
+margin-top:15px;
+border:none;
+border-radius:10px;
+outline:none;
+font-size:15px;
+transition:0.3s;
+}
+
+input:focus{
+transform:scale(1.02);
+}
+
+/* BUTTON */
+button{
+width:100%;
+padding:13px;
+margin-top:20px;
+background:#00c853;
+color:white;
+border:none;
+border-radius:10px;
+font-size:16px;
+cursor:pointer;
+transition:0.3s;
+}
+
+button:hover{
+background:#00a844;
+transform:translateY(-2px);
+}
+
+/* MESSAGE */
+.message{
+text-align:center;
+margin-bottom:10px;
+color:#a5ffb0;
+font-weight:bold;
+}
+
+/* LINK */
+a{
+color:white;
+text-decoration:none;
+font-weight:bold;
+}
+
+a:hover{
+text-decoration:underline;
+}
+
+/* FOOTER TEXT */
+p{
+text-align:center;
+margin-top:15px;
+}
+
+/* MOBILE */
+@media(max-width:450px){
+.form-box{
+width:90%;
+}
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="form-box">
+
+<h1>Create Account</h1>
+
+<p class="message">{{ message }}</p>
+
+<form method="POST">
+
+<input type="text" name="username" placeholder="Username" required>
+
+<input type="email" name="email" placeholder="Email Address" required>
+
+<input type="password" name="password" placeholder="Password" required>
+
+<button type="submit">Register</button>
+
+</form>
+
+<p>
+Already have an account?
+<a href="/login">Login</a>
+</p>
+
+</div>
+
+</body>
+</html>
