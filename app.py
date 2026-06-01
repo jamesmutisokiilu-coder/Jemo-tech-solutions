@@ -1,19 +1,26 @@
 from flask import Flask, render_template, request, redirect, session, url_for
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 import os
 
+# ==========================================
+# APP CONFIG
+# ==========================================
 app = Flask(__name__)
 
-# ==========================================
-# CONFIG
-# ==========================================
 app.secret_key = os.environ.get("SECRET_KEY", "jemo_secret_key")
 
+# ==========================================
+# DATABASE CONFIG (SQLALCHEMY ONLY)
+# ==========================================
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# Fix Render postgres URL format
+# Fix for Render (postgres:// -> postgresql://)
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+if not DATABASE_URL:
+    raise Exception("DATABASE_URL not set in environment variables")
 
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -21,40 +28,42 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 # ==========================================
-# MODELS
+# DATABASE MODELS
 # ==========================================
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(200), nullable=False)
-    email = db.Column(db.String(200), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
+    username = db.Column(db.String(150), nullable=False)
+    email = db.Column(db.String(150), unique=True, nullable=False)
+    password = db.Column(db.String(300), nullable=False)
 
 
 class Support(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200))
-    email = db.Column(db.String(200))
-    phone = db.Column(db.String(100))
+    name = db.Column(db.String(150))
+    email = db.Column(db.String(150))
+    phone = db.Column(db.String(50))
     category = db.Column(db.String(100))
-    priority = db.Column(db.String(100))
+    priority = db.Column(db.String(50))
     message = db.Column(db.Text)
 
 
-class Training(db.Model):
+class TrainingRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200))
-    course = db.Column(db.String(200))
-    email = db.Column(db.String(200))
+    name = db.Column(db.String(150))
+    course = db.Column(db.String(150))
+    email = db.Column(db.String(150))
 
 
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200))
-    service = db.Column(db.String(200))
-    date = db.Column(db.String(100))
+    name = db.Column(db.String(150))
+    service = db.Column(db.String(150))
+    date = db.Column(db.String(50))
 
 
-# Create tables
+# ==========================================
+# CREATE TABLES
+# ==========================================
 with app.app_context():
     db.create_all()
 
@@ -65,32 +74,38 @@ with app.app_context():
 def home():
     return render_template("index.html")
 
-
 # ==========================================
-# REGISTER
+# REGISTER (FIXED)
 # ==========================================
 @app.route("/register", methods=["GET", "POST"])
 def register():
     message = ""
 
     if request.method == "POST":
+        username = request.form["username"]
+        email = request.form["email"]
+        password = request.form["password"]
+
         try:
-            user = User(
-                username=request.form["username"],
-                email=request.form["email"],
-                password=request.form["password"]
+            existing = User.query.filter_by(email=email).first()
+            if existing:
+                return render_template("register.html", message="Email already exists")
+
+            new_user = User(
+                username=username,
+                email=email,
+                password=generate_password_hash(password)
             )
 
-            db.session.add(user)
+            db.session.add(new_user)
             db.session.commit()
 
             return redirect(url_for("login"))
 
         except Exception as e:
-            message = f"Error: {str(e)}"
+            return render_template("register.html", message=str(e))
 
     return render_template("register.html", message=message)
-
 
 # ==========================================
 # LOGIN
@@ -100,19 +115,18 @@ def login():
     message = ""
 
     if request.method == "POST":
-        user = User.query.filter_by(
-            email=request.form["email"],
-            password=request.form["password"]
-        ).first()
+        email = request.form["email"]
+        password = request.form["password"]
 
-        if user:
+        user = User.query.filter_by(email=email).first()
+
+        if user and check_password_hash(user.password, password):
             session["user"] = user.username
             return redirect(url_for("dashboard"))
         else:
             message = "Invalid login details"
 
     return render_template("login.html", message=message)
-
 
 # ==========================================
 # DASHBOARD
@@ -124,7 +138,6 @@ def dashboard():
 
     return render_template("dashboard.html", username=session["user"])
 
-
 # ==========================================
 # LOGOUT
 # ==========================================
@@ -132,7 +145,6 @@ def dashboard():
 def logout():
     session.clear()
     return redirect(url_for("login"))
-
 
 # ==========================================
 # PROTECTED PAGES
@@ -142,36 +154,29 @@ def protected(page):
         return redirect(url_for("login"))
     return render_template(page)
 
-
 @app.route("/services")
 def services():
     return protected("services.html")
-
 
 @app.route("/portfolio")
 def portfolio():
     return protected("portfolio.html")
 
-
 @app.route("/blog")
 def blog():
     return protected("blog.html")
-
 
 @app.route("/downloads")
 def downloads():
     return protected("downloads.html")
 
-
 @app.route("/about")
 def about():
     return protected("about.html")
 
-
 @app.route("/contact")
 def contact():
     return protected("contact.html")
-
 
 # ==========================================
 # SUPPORT
@@ -182,7 +187,7 @@ def support():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        s = Support(
+        new_support = Support(
             name=request.form["name"],
             email=request.form["email"],
             phone=request.form["phone"],
@@ -191,13 +196,12 @@ def support():
             message=request.form["message"]
         )
 
-        db.session.add(s)
+        db.session.add(new_support)
         db.session.commit()
 
         return redirect(url_for("dashboard"))
 
     return render_template("support.html")
-
 
 # ==========================================
 # TRAINING
@@ -208,19 +212,18 @@ def training():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        t = Training(
+        new_request = TrainingRequest(
             name=request.form["name"],
             course=request.form["course"],
             email=request.form["email"]
         )
 
-        db.session.add(t)
+        db.session.add(new_request)
         db.session.commit()
 
         return redirect(url_for("dashboard"))
 
     return render_template("training.html")
-
 
 # ==========================================
 # BOOKING
@@ -231,19 +234,18 @@ def booking():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        b = Booking(
+        new_booking = Booking(
             name=request.form["name"],
             service=request.form["service"],
             date=request.form["date"]
         )
 
-        db.session.add(b)
+        db.session.add(new_booking)
         db.session.commit()
 
         return redirect(url_for("dashboard"))
 
     return render_template("booking.html")
-
 
 # ==========================================
 # RUN APP
