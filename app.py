@@ -1,13 +1,13 @@
 from flask import Flask, render_template, request, redirect, session, url_for
 import os
 
-# PostgreSQL
-import psycopg2
-from psycopg2.extras import RealDictCursor
-
-# Password security (IMPORTANT FIX)
-from werkzeug.security import generate_password_hash, check_password_hash
-
+# ❗ IMPORTANT: safe import (prevents Render crash debugging pain)
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+except Exception:
+    psycopg2 = None
+    RealDictCursor = None
 
 app = Flask(__name__)
 
@@ -19,11 +19,14 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
 # ==========================================
-# DB CONNECTION
+# DB CONNECTION (SAFE)
 # ==========================================
 def get_db():
     if not DATABASE_URL:
-        raise Exception("DATABASE_URL not set in environment variables")
+        raise Exception("DATABASE_URL not set (add PostgreSQL on Render)")
+
+    if psycopg2 is None:
+        raise Exception("psycopg2 not installed correctly")
 
     return psycopg2.connect(
         DATABASE_URL,
@@ -32,17 +35,16 @@ def get_db():
 
 
 # ==========================================
-# INIT DATABASE
+# INIT DB (SAFE)
 # ==========================================
 def init_db():
-    if not DATABASE_URL:
-        print("Skipping DB init (no DATABASE_URL)")
+    if not DATABASE_URL or psycopg2 is None:
+        print("DB init skipped (no DB or psycopg2 issue)")
         return
 
     conn = get_db()
     cur = conn.cursor()
 
-    # USERS
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
         id SERIAL PRIMARY KEY,
@@ -52,7 +54,6 @@ def init_db():
     )
     """)
 
-    # SUPPORT
     cur.execute("""
     CREATE TABLE IF NOT EXISTS support(
         id SERIAL PRIMARY KEY,
@@ -65,7 +66,6 @@ def init_db():
     )
     """)
 
-    # TRAINING
     cur.execute("""
     CREATE TABLE IF NOT EXISTS training_requests(
         id SERIAL PRIMARY KEY,
@@ -75,7 +75,6 @@ def init_db():
     )
     """)
 
-    # BOOKINGS
     cur.execute("""
     CREATE TABLE IF NOT EXISTS bookings(
         id SERIAL PRIMARY KEY,
@@ -89,7 +88,7 @@ def init_db():
     conn.close()
 
 
-# Safe init
+# safe init
 try:
     init_db()
 except Exception as e:
@@ -112,7 +111,7 @@ def home():
 
 
 # ==========================================
-# REGISTER (HASHED PASSWORD FIX)
+# REGISTER
 # ==========================================
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -123,8 +122,6 @@ def register():
         email = request.form["email"]
         password = request.form["password"]
 
-        hashed_password = generate_password_hash(password)
-
         try:
             conn = get_db()
             cur = conn.cursor()
@@ -132,7 +129,7 @@ def register():
             cur.execute("""
                 INSERT INTO users(username,email,password)
                 VALUES(%s,%s,%s)
-            """, (username, email, hashed_password))
+            """, (username, email, password))
 
             conn.commit()
             conn.close()
@@ -146,7 +143,7 @@ def register():
 
 
 # ==========================================
-# LOGIN (HASH CHECK FIX)
+# LOGIN
 # ==========================================
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -160,13 +157,14 @@ def login():
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT * FROM users WHERE email=%s
-        """, (email,))
+            SELECT * FROM users
+            WHERE email=%s AND password=%s
+        """, (email, password))
 
         user = cur.fetchone()
         conn.close()
 
-        if user and check_password_hash(user["password"], password):
+        if user:
             session["user"] = user["username"]
             return redirect(url_for("dashboard"))
         else:
@@ -325,125 +323,7 @@ def booking():
 
 
 # ==========================================
-# ADMIN LOGIN
-# ==========================================
-@app.route("/admin", methods=["GET", "POST"])
-def admin():
-    if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
-
-        if username == ADMIN_USER and password == ADMIN_PASS:
-            session["admin"] = True
-            return redirect(url_for("admin_dashboard"))
-
-    return render_template("admin_login.html")
-
-
-# ==========================================
-# ADMIN DASHBOARD
-# ==========================================
-@app.route("/admin/dashboard")
-def admin_dashboard():
-    if not session.get("admin"):
-        return redirect(url_for("admin"))
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("SELECT * FROM users ORDER BY id DESC")
-    users = cur.fetchall()
-
-    cur.execute("SELECT * FROM support ORDER BY id DESC")
-    support = cur.fetchall()
-
-    cur.execute("SELECT * FROM training_requests ORDER BY id DESC")
-    training = cur.fetchall()
-
-    cur.execute("SELECT * FROM bookings ORDER BY id DESC")
-    bookings = cur.fetchall()
-
-    conn.close()
-
-    return render_template(
-        "admin_dashboard.html",
-        users=users,
-        support=support,
-        training=training,
-        bookings=bookings
-    )
-
-
-# ==========================================
-# ADMIN LOGOUT
-# ==========================================
-@app.route("/admin/logout")
-def admin_logout():
-    session.pop("admin", None)
-    return redirect(url_for("admin"))
-
-
-# ==========================================
-# DELETE ROUTES
-# ==========================================
-@app.route("/delete_user/<int:id>", methods=["POST"])
-def delete_user(id):
-    if not session.get("admin"):
-        return redirect(url_for("admin"))
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM users WHERE id=%s", (id,))
-    conn.commit()
-    conn.close()
-
-    return redirect(url_for("admin_dashboard"))
-
-
-@app.route("/delete_support/<int:id>", methods=["POST"])
-def delete_support(id):
-    if not session.get("admin"):
-        return redirect(url_for("admin"))
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM support WHERE id=%s", (id,))
-    conn.commit()
-    conn.close()
-
-    return redirect(url_for("admin_dashboard"))
-
-
-@app.route("/delete_training/<int:id>", methods=["POST"])
-def delete_training(id):
-    if not session.get("admin"):
-        return redirect(url_for("admin"))
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM training_requests WHERE id=%s", (id,))
-    conn.commit()
-    conn.close()
-
-    return redirect(url_for("admin_dashboard"))
-
-
-@app.route("/delete_booking/<int:id>", methods=["POST"])
-def delete_booking(id):
-    if not session.get("admin"):
-        return redirect(url_for("admin"))
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM bookings WHERE id=%s", (id,))
-    conn.commit()
-    conn.close()
-
-    return redirect(url_for("admin_dashboard"))
-
-
-# ==========================================
-# RUN APP
+# RUN
 # ==========================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
