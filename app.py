@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, url_for
 import os
 
-# ❗ IMPORTANT: safe import (prevents Render crash debugging pain)
+# Safe psycopg2 import (prevents Render crash)
 try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
@@ -19,14 +19,14 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
 # ==========================================
-# DB CONNECTION (SAFE)
+# DB CONNECTION
 # ==========================================
 def get_db():
     if not DATABASE_URL:
-        raise Exception("DATABASE_URL not set (add PostgreSQL on Render)")
+        raise Exception("DATABASE_URL not set")
 
     if psycopg2 is None:
-        raise Exception("psycopg2 not installed correctly")
+        raise Exception("psycopg2 not installed")
 
     return psycopg2.connect(
         DATABASE_URL,
@@ -35,11 +35,11 @@ def get_db():
 
 
 # ==========================================
-# INIT DB (SAFE)
+# INIT DB
 # ==========================================
 def init_db():
     if not DATABASE_URL or psycopg2 is None:
-        print("DB init skipped (no DB or psycopg2 issue)")
+        print("DB init skipped")
         return
 
     conn = get_db()
@@ -88,18 +88,10 @@ def init_db():
     conn.close()
 
 
-# safe init
 try:
     init_db()
 except Exception as e:
-    print("DB init skipped:", e)
-
-
-# ==========================================
-# ADMIN LOGIN
-# ==========================================
-ADMIN_USER = "admin"
-ADMIN_PASS = "1234"
+    print("DB init error:", e)
 
 
 # ==========================================
@@ -111,7 +103,7 @@ def home():
 
 
 # ==========================================
-# REGISTER
+# ✅ FIXED REGISTER (IMPORTANT PART)
 # ==========================================
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -126,18 +118,26 @@ def register():
             conn = get_db()
             cur = conn.cursor()
 
-            cur.execute("""
-                INSERT INTO users(username,email,password)
-                VALUES(%s,%s,%s)
-            """, (username, email, password))
+            # check if email exists
+            cur.execute("SELECT * FROM users WHERE email=%s", (email,))
+            existing = cur.fetchone()
 
-            conn.commit()
+            if existing:
+                message = "Email already exists"
+            else:
+                cur.execute("""
+                    INSERT INTO users(username,email,password)
+                    VALUES(%s,%s,%s)
+                """, (username, email, password))
+
+                conn.commit()
+                message = "Registration Successful"
+
             conn.close()
 
-            message = "Registration Successful"
-
-        except Exception:
-            message = "Email already exists or DB error"
+        except Exception as e:
+            print("REGISTER ERROR:", e)
+            message = "Database error (check logs)"
 
     return render_template("register.html", message=message)
 
