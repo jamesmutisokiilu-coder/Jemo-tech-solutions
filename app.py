@@ -169,9 +169,79 @@ def protected(page):
 def services():
     return protected("services.html")
 
-@app.route("/admin")
+# ==========================================
+# ADMIN LOGIN SETTINGS
+# ==========================================
+ADMIN_USERNAME = "programmer"
+ADMIN_PASSWORD = "extravaganza"
+
+
+# ==========================================
+# ADMIN LOGIN
+# ==========================================
+@app.route("/admin", methods=["GET", "POST"])
 def admin():
-    return render_template("admin_login.html")
+
+    error = ""
+
+    if request.method == "POST":
+
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session["admin"] = True
+            return redirect(url_for("admin_dashboard"))
+
+        error = "Invalid admin username or password"
+
+    return render_template(
+        "admin_login.html",
+        error=error
+    )
+
+
+# ==========================================
+# ADMIN DASHBOARD
+# ==========================================
+@app.route("/admin/dashboard")
+def admin_dashboard():
+
+    if not session.get("admin"):
+        return redirect(url_for("admin"))
+
+    users_count = User.query.count()
+    support_count = Support.query.count()
+    training_count = TrainingRequest.query.count()
+    bookings_count = Booking.query.count()
+
+    users = User.query.order_by(User.id.desc()).all()
+    supports = Support.query.order_by(Support.id.desc()).all()
+    trainings = TrainingRequest.query.order_by(TrainingRequest.id.desc()).all()
+    bookings = Booking.query.order_by(Booking.id.desc()).all()
+
+    return render_template(
+        "admin_dashboard.html",
+        users_count=users_count,
+        support_count=support_count,
+        training_count=training_count,
+        bookings_count=bookings_count,
+        users=users,
+        supports=supports,
+        trainings=trainings,
+        bookings=bookings
+    )
+
+
+# ==========================================
+# ADMIN LOGOUT
+# ==========================================
+@app.route("/admin/logout")
+def admin_logout():
+
+    session.pop("admin", None)
+
+    return redirect(url_for("admin"))
 
 @app.route("/portfolio")
 def portfolio():
