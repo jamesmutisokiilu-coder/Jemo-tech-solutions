@@ -70,12 +70,7 @@ class Booking(db.Model):
     date = db.Column(db.String(50))
 
 
-# ==========================================
-# RESET DATABASE (TEMP FIX — REMOVE AFTER FIXING)
-# ==========================================
-with app.app_context():
-    db.drop_all()   # ⚠️ deletes old broken tables
-    db.create_all() # ✔ recreates correct tables
+
 
 # ==========================================
 # HOME
