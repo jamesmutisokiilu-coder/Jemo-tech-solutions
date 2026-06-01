@@ -169,6 +169,10 @@ def protected(page):
 def services():
     return protected("services.html")
 
+@app.route("/admin")
+def admin():
+    ...
+
 @app.route("/portfolio")
 def portfolio():
     return protected("portfolio.html")
