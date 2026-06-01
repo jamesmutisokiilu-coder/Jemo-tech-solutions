@@ -1,9 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, url_for
 import os
 
-# ==========================================
-# SAFE IMPORT (Render protection)
-# ==========================================
+# Safe import (prevents Render crash)
 try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
@@ -11,43 +9,32 @@ except Exception:
     psycopg2 = None
     RealDictCursor = None
 
-
 app = Flask(__name__)
 
 # ==========================================
 # CONFIG
 # ==========================================
 app.secret_key = os.environ.get("SECRET_KEY", "jemo_secret_key")
-
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# FIX: Render postgres compatibility
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-
 # ==========================================
-# DB CONNECTION
+# DATABASE CONNECTION
 # ==========================================
 def get_db():
     if not DATABASE_URL:
-        raise Exception("DATABASE_URL not set in environment variables")
+        raise Exception("DATABASE_URL not set")
 
     if psycopg2 is None:
-        raise Exception("psycopg2 not installed properly")
+        raise Exception("psycopg2 not installed correctly")
 
-    return psycopg2.connect(
-        DATABASE_URL,
-        cursor_factory=RealDictCursor
-    )
-
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 # ==========================================
-# INIT DB
+# INIT DATABASE
 # ==========================================
 def init_db():
     if not DATABASE_URL or psycopg2 is None:
-        print("DB init skipped")
+        print("DB init skipped (missing DB or psycopg2)")
         return
 
     conn = get_db()
@@ -95,12 +82,11 @@ def init_db():
     conn.commit()
     conn.close()
 
-
+# run safely
 try:
     init_db()
 except Exception as e:
-    print("DB INIT ERROR:", e)
-
+    print("DB init error:", e)
 
 # ==========================================
 # HOME
@@ -109,9 +95,8 @@ except Exception as e:
 def home():
     return render_template("index.html")
 
-
 # ==========================================
-# ✅ REGISTER (FIXED)
+# REGISTER
 # ==========================================
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -126,29 +111,20 @@ def register():
             conn = get_db()
             cur = conn.cursor()
 
-            # check existing email
-            cur.execute("SELECT id FROM users WHERE email=%s", (email,))
-            existing = cur.fetchone()
+            cur.execute("""
+                INSERT INTO users(username,email,password)
+                VALUES(%s,%s,%s)
+            """, (username, email, password))
 
-            if existing:
-                message = "Email already exists"
-            else:
-                cur.execute("""
-                    INSERT INTO users(username,email,password)
-                    VALUES(%s,%s,%s)
-                """, (username, email, password))
-
-                conn.commit()
-                message = "Registration successful"
-
+            conn.commit()
             conn.close()
 
+            return redirect(url_for("login"))
+
         except Exception as e:
-            print("REGISTER ERROR:", e)
-            message = f"Database error: {e}"
+            message = str(e)
 
     return render_template("register.html", message=message)
-
 
 # ==========================================
 # LOGIN
@@ -180,11 +156,9 @@ def login():
                 message = "Invalid login details"
 
         except Exception as e:
-            print("LOGIN ERROR:", e)
-            message = "Database error"
+            message = str(e)
 
     return render_template("login.html", message=message)
-
 
 # ==========================================
 # DASHBOARD
@@ -196,7 +170,6 @@ def dashboard():
 
     return render_template("dashboard.html", username=session["user"])
 
-
 # ==========================================
 # LOGOUT
 # ==========================================
@@ -204,7 +177,6 @@ def dashboard():
 def logout():
     session.clear()
     return redirect(url_for("login"))
-
 
 # ==========================================
 # PROTECTED PAGES
@@ -214,36 +186,29 @@ def protected(page):
         return redirect(url_for("login"))
     return render_template(page)
 
-
 @app.route("/services")
 def services():
     return protected("services.html")
-
 
 @app.route("/portfolio")
 def portfolio():
     return protected("portfolio.html")
 
-
 @app.route("/blog")
 def blog():
     return protected("blog.html")
-
 
 @app.route("/downloads")
 def downloads():
     return protected("downloads.html")
 
-
 @app.route("/about")
 def about():
     return protected("about.html")
 
-
 @app.route("/contact")
 def contact():
     return protected("contact.html")
-
 
 # ==========================================
 # SUPPORT
@@ -276,7 +241,6 @@ def support():
 
     return render_template("support.html")
 
-
 # ==========================================
 # TRAINING
 # ==========================================
@@ -304,7 +268,6 @@ def training():
         return redirect(url_for("dashboard"))
 
     return render_template("training.html")
-
 
 # ==========================================
 # BOOKING
@@ -334,9 +297,8 @@ def booking():
 
     return render_template("booking.html")
 
-
 # ==========================================
-# RUN
+# RUN APP
 # ==========================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
