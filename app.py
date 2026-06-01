@@ -7,20 +7,21 @@ import os
 # APP CONFIG
 # ==========================================
 app = Flask(__name__)
-
 app.secret_key = os.environ.get("SECRET_KEY", "jemo_secret_key")
 
 # ==========================================
-# DATABASE CONFIG (SQLALCHEMY ONLY)
+# DATABASE CONFIG (NO psycopg2)
 # ==========================================
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# Fix for Render (postgres:// -> postgresql://)
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
 if not DATABASE_URL:
     raise Exception("DATABASE_URL not set in environment variables")
+
+# FIX FOR RENDER + USE pg8000 DRIVER
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+pg8000://", 1)
+else:
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+pg8000://", 1)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -28,7 +29,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 # ==========================================
-# DATABASE MODELS
+# MODELS
 # ==========================================
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -74,6 +75,7 @@ with app.app_context():
 def home():
     return render_template("index.html")
 
+
 # ==========================================
 # REGISTER (FIXED)
 # ==========================================
@@ -91,13 +93,13 @@ def register():
             if existing:
                 return render_template("register.html", message="Email already exists")
 
-            new_user = User(
+            user = User(
                 username=username,
                 email=email,
                 password=generate_password_hash(password)
             )
 
-            db.session.add(new_user)
+            db.session.add(user)
             db.session.commit()
 
             return redirect(url_for("login"))
@@ -106,6 +108,7 @@ def register():
             return render_template("register.html", message=str(e))
 
     return render_template("register.html", message=message)
+
 
 # ==========================================
 # LOGIN
@@ -128,6 +131,7 @@ def login():
 
     return render_template("login.html", message=message)
 
+
 # ==========================================
 # DASHBOARD
 # ==========================================
@@ -138,6 +142,7 @@ def dashboard():
 
     return render_template("dashboard.html", username=session["user"])
 
+
 # ==========================================
 # LOGOUT
 # ==========================================
@@ -145,6 +150,7 @@ def dashboard():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
 
 # ==========================================
 # PROTECTED PAGES
@@ -154,29 +160,36 @@ def protected(page):
         return redirect(url_for("login"))
     return render_template(page)
 
+
 @app.route("/services")
 def services():
     return protected("services.html")
+
 
 @app.route("/portfolio")
 def portfolio():
     return protected("portfolio.html")
 
+
 @app.route("/blog")
 def blog():
     return protected("blog.html")
+
 
 @app.route("/downloads")
 def downloads():
     return protected("downloads.html")
 
+
 @app.route("/about")
 def about():
     return protected("about.html")
 
+
 @app.route("/contact")
 def contact():
     return protected("contact.html")
+
 
 # ==========================================
 # SUPPORT
@@ -187,7 +200,7 @@ def support():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        new_support = Support(
+        support = Support(
             name=request.form["name"],
             email=request.form["email"],
             phone=request.form["phone"],
@@ -196,12 +209,13 @@ def support():
             message=request.form["message"]
         )
 
-        db.session.add(new_support)
+        db.session.add(support)
         db.session.commit()
 
         return redirect(url_for("dashboard"))
 
     return render_template("support.html")
+
 
 # ==========================================
 # TRAINING
@@ -212,18 +226,19 @@ def training():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        new_request = TrainingRequest(
+        req = TrainingRequest(
             name=request.form["name"],
             course=request.form["course"],
             email=request.form["email"]
         )
 
-        db.session.add(new_request)
+        db.session.add(req)
         db.session.commit()
 
         return redirect(url_for("dashboard"))
 
     return render_template("training.html")
+
 
 # ==========================================
 # BOOKING
@@ -234,21 +249,22 @@ def booking():
         return redirect(url_for("login"))
 
     if request.method == "POST":
-        new_booking = Booking(
+        book = Booking(
             name=request.form["name"],
             service=request.form["service"],
             date=request.form["date"]
         )
 
-        db.session.add(new_booking)
+        db.session.add(book)
         db.session.commit()
 
         return redirect(url_for("dashboard"))
 
     return render_template("booking.html")
 
+
 # ==========================================
-# RUN APP
+# RUN
 # ==========================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
